@@ -12,7 +12,7 @@ class SE_missatsamtal_HE extends superfecta_base {
 	       'default' => 3
              ),
              'API_Key' => ARRAY (
-               'description' => 'API Key is not yet available from missatsamtal.se (not needed)',
+               'description' => 'API Key is required for missatsamtal.se (look at https://missatsamtal.se/api for more information)',
                'type' => 'text'
              )
     );
@@ -21,17 +21,24 @@ class SE_missatsamtal_HE extends superfecta_base {
         $caller_id = null;
 
         $this->DebugPrint("Searching missatsamtal.se... ");
-        $url = "http://api.missatsamtal.se/?action=search&number=$thenumber&numberOfCompanies=1";
+        $url = "https://api.missatsamtal.se/?action=search&number=$thenumber&numberOfCompanies=1&key=".$run_param['API_Key'];
         $value = $this->get_url_contents($url);
 
 	// $VALUE = NAMNET PA FORETAGET
 	// $spamcalls = antalet ganger som spamnumret ar listat
 	
 	$start = strpos($value, "comments");            // STARTPOS is position for the first char in "comments"
-
         $value = substr($value,$start+11);              // Skip text "comments"
-        $this->DebugPrint("NEWVAULE=".$value."\n");
-
+		
+		if (strpos($value, "error") == false){
+			$this->DebugPrint("NEWVAULE=".$value."\n\n");} else {
+				$start = strpos($value, "error");				// STARTPOS is position for the first char in "error"
+				$value = substr($value,$start+23);				// Skip text "error" and "missatsamtal.se"
+				
+				$end = strpos($value, "\"");					// Look for next ["] indication the end of the error msg
+				$error = substr($value,0,$end);					// Save result in $error from startpost 0 to endpos $end
+				$this->DebugPrint("\n\n<b>Sorry " . $error . "!!!!</b>");
+			}
         $end = strpos($value, "\"");                    // Look for next ["] indication the end of the number
         $spamcalls = substr($value,0,$end);             // Save result in $spamcalls
 	
@@ -40,17 +47,21 @@ class SE_missatsamtal_HE extends superfecta_base {
 
         $end = strpos($value, "\"");                    // Look for next ["] indication the end of the name
         $value = substr($value,0,$end);                 // Save result in $value from startpost 0 to endpos $end
-
+		
 	$SPAM_threshold = intval($spamcalls);
         $this->DebugPrint("SPAMVALUE RECEIVED=".$SPAM_threshold."\n");
 	    
-        if ($value != "0" ) {
+        if ($value != "0" && empty($error)) {
             $this->spam = true;
             $this->DebugPrint(" determined to be SPAM");
         } else {
-            $this->DebugPrint("Not a SPAM caller");
+			if (isset($error)) {
+				$this->DebugPrint("Read bold text above fatal error!!!");
+			} else {
+				$this->DebugPrint("Not a SPAM caller");
+			}
 	    return("");
         }
-        return("SPAM:".$value);
+        return($value);
     }
 }
